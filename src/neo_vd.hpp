@@ -163,14 +163,14 @@ struct VagueDenoiser final : Filter {
       ep.padSizeBytes[0] = ep.padStrideElements[0] * in_vi.Height * sizeof(float);
       ep.padSizeBytes[1] =
       ep.padSizeBytes[2] = ep.padStrideElements[1] * planeH * sizeof(float);
-
-      ep.tmpSizeBytes[0] = (32 + width_height_y) * sizeof(float);
-      ep.tmpSizeBytes[1] =
-      ep.tmpSizeBytes[2] = (32 + width_height_uv) * sizeof(float);
     }
     else
       ep.threshold /= 255.f;
-    
+
+    ep.tmpSizeBytes[0] = (32 + width_height_y) * sizeof(float);
+    ep.tmpSizeBytes[1] =
+    ep.tmpSizeBytes[2] = (32 + width_height_uv) * sizeof(float);
+
     ep.analysisLow = analysisLow;
     ep.analysisHigh = analysisHigh;
     ep.synthesisLow = synthesisLow;

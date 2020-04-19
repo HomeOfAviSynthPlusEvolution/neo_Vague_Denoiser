@@ -138,7 +138,7 @@ static void invertStep(const float * input, float * output, float * temp, const 
   auto synL2 = _mm256_set1_ps(ep.synthesisLow[2]);
   auto synL3 = _mm256_set1_ps(ep.synthesisLow[3]);
 
-  for (int i = 8; i < findex + 8; i += 8) {
+  for (int i = 8; i < findex + 12; i += 8) {
     auto tmp0 = _mm256_load_ps(temp + i + 0);
     auto tmp1 = _mm256_loadu_ps(temp + i + 1);
     auto tmp2 = _mm256_loadu_ps(temp + i + 2);
@@ -171,7 +171,7 @@ static void invertStep(const float * input, float * output, float * temp, const 
   auto synH3 = _mm256_set1_ps(ep.synthesisHigh[3]);
   auto synH4 = _mm256_set1_ps(ep.synthesisHigh[4]);
 
-  for (int i = 8; i < findex + 8; i += 8) {
+  for (int i = 8; i < findex + 12; i += 8) {
     auto tmp0 = _mm256_loadu_ps(temp + i - 1);
     auto tmp1 = _mm256_load_ps(temp + i + 0);
     auto tmp2 = _mm256_loadu_ps(temp + i + 1);
