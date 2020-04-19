@@ -34,6 +34,17 @@ Parameters:
 
     Default: 3.
 
+- *opt*
+
+    Sets which CPU optimizations to use.
+
+        0 - Auto detect
+        1 - Use C
+        2 - Use up to SSE (for core)
+        3 - Use up to SSE4.1 (for data copy)
+        4 - Use up to AVX (for core)
+        5 - Use up to AVX2 (for data copy)
+
 ## License
 
 * GPLv2.

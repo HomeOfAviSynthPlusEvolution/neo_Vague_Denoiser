@@ -1,15 +1,13 @@
 #include "core.h"
 
-static constexpr int NPAD = 10;
+template <typename T>
+void cast_to_pad_C(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr, int depth, int stride, int width, int height);
 
 template <typename T>
-void cast_to_pad_c(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr, int depth, int stride, int width, int height);
-
-template <typename T>
-void cast_from_pad_c(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr, int depth, int stride, int width, int height);
+void cast_from_pad_C(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr, int depth, int stride, int width, int height);
 
 template <>
-void cast_to_pad_c<uint8_t>(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr, int depth, int stride, int width, int height)
+void cast_to_pad_C<uint8_t>(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr, int depth, int stride, int width, int height)
 {
   auto pad = ep.padBuffer[plane][thread_id];
   for (int y = 0; y < height; y++) {
@@ -21,7 +19,7 @@ void cast_to_pad_c<uint8_t>(EngineParams& ep, unsigned int thread_id, int plane,
 }
 
 template <>
-void cast_to_pad_c<uint16_t>(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr0, int depth, int stride, int width, int height)
+void cast_to_pad_C<uint16_t>(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr0, int depth, int stride, int width, int height)
 {
   const uint16_t* ptr = reinterpret_cast<const uint16_t*>(ptr0);
   stride >>= 1;
@@ -35,7 +33,7 @@ void cast_to_pad_c<uint16_t>(EngineParams& ep, unsigned int thread_id, int plane
 }
 
 template <>
-void cast_from_pad_c<uint8_t>(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr, int depth, int stride, int width, int height)
+void cast_from_pad_C<uint8_t>(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr, int depth, int stride, int width, int height)
 {
   auto pad = ep.padBuffer[plane][thread_id];
   for (int y = 0; y < height; y++) {
@@ -47,7 +45,7 @@ void cast_from_pad_c<uint8_t>(EngineParams& ep, unsigned int thread_id, int plan
 }
 
 template <>
-void cast_from_pad_c<uint16_t>(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr0, int depth, int stride, int width, int height)
+void cast_from_pad_C<uint16_t>(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr0, int depth, int stride, int width, int height)
 {
   uint16_t* ptr = reinterpret_cast<uint16_t*>(ptr0);
   stride >>= 1;
@@ -85,22 +83,22 @@ static inline void copy(const float * p1, float * p2, const int stride2, const i
 // same for right boundary
 // if rightExt=1 then ... 3 2 1 0 | 1 2 3
 static void symmetricExtension(float * output, const int size, const int leftExt, const int rightExt) {
-    int first = NPAD;
-    int last = NPAD - 1 + size;
+    int first = NPADDING;
+    int last = NPADDING - 1 + size;
 
     const int originalLast = last;
 
     if (leftExt == 2)
-        output[--first] = output[NPAD];
+        output[--first] = output[NPADDING];
     if (rightExt == 2)
         output[++last] = output[originalLast];
 
     // extend left end
     int nextend = first;
     for (int i = 0; i < nextend; i++)
-        output[--first] = output[NPAD + 1 + i];
+        output[--first] = output[NPADDING + 1 + i];
 
-    const int idx = NPAD + NPAD - 1 + size;
+    const int idx = NPADDING + NPADDING - 1 + size;
 
     // extend right end
     nextend = idx - last;
@@ -111,7 +109,7 @@ static void symmetricExtension(float * output, const int size, const int leftExt
 static void transformStep(float * input, float * output, const int size, const int lowSize, EngineParams& ep) {
     symmetricExtension(input, size, 1, 1);
 
-    for (int i = NPAD; i < NPAD + lowSize; i++) {
+    for (int i = NPADDING; i < NPADDING + lowSize; i++) {
         const float a = input[2 * i - 14] * ep.analysisLow[0];
         const float b = input[2 * i - 13] * ep.analysisLow[1];
         const float c = input[2 * i - 12] * ep.analysisLow[2];
@@ -123,7 +121,7 @@ static void transformStep(float * input, float * output, const int size, const i
         const float k = input[2 * i - 6] * ep.analysisLow[0];
         output[i] = a + b + c + d + e + f + g + h + k;
     }
-    for (int i = NPAD; i < NPAD + lowSize; i++) {
+    for (int i = NPADDING; i < NPADDING + lowSize; i++) {
         const float a = input[2 * i - 12] * ep.analysisHigh[0];
         const float b = input[2 * i - 11] * ep.analysisHigh[1];
         const float c = input[2 * i - 10] * ep.analysisHigh[2];
@@ -139,13 +137,13 @@ static void invertStep(const float * input, float * output, float * temp, const 
     const int lowSize = (size + 1) >> 1;
     const int highSize = size >> 1;
 
-    memcpy(temp + NPAD, input + NPAD, lowSize * sizeof(float));
+    memcpy(temp + NPADDING, input + NPADDING, lowSize * sizeof(float));
 
     int leftExt = 1;
     int rightExt = (size % 2 == 0) ? 2 : 1;
     symmetricExtension(temp, lowSize, leftExt, rightExt);
 
-    memset(output, 0, (NPAD + NPAD + size) * sizeof(float));
+    memset(output, 0, (NPADDING + NPADDING + size) * sizeof(float));
     const int findex = (size + 2) >> 1;
 
     for (int i = 9; i < findex + 11; i++) {
@@ -162,7 +160,7 @@ static void invertStep(const float * input, float * output, float * temp, const 
         output[2 * i - 7] += a;
     }
 
-    memcpy(temp + NPAD, input + NPAD + lowSize, highSize * sizeof(float));
+    memcpy(temp + NPADDING, input + NPADDING + lowSize, highSize * sizeof(float));
 
     leftExt = 2;
     rightExt = (size % 2 == 0) ? 1 : 2;
@@ -241,7 +239,7 @@ static void qianThresholding(float * block, const int width, const int height, c
     }
 }
 
-void filter(EngineParams& ep, unsigned int thread_id, int plane, float * src, int src_stride_elements, int width, int height)
+void filter_C(EngineParams& ep, unsigned int thread_id, int plane, float * src, int src_stride_elements, int width, int height)
 {
   float* tempIn = ep.tmpBuffer[plane][0][thread_id];
   float* tempOut = ep.tmpBuffer[plane][1][thread_id];
@@ -259,18 +257,18 @@ void filter(EngineParams& ep, unsigned int thread_id, int plane, float * src, in
     int lowSize = (hLowSize0 + 1) >> 1;
     float * input = src;
     for (int j = 0; j < vLowSize0; j++) {
-      copy(input, tempIn + NPAD, hLowSize0);
+      copy(input, tempIn + NPADDING, hLowSize0);
       transformStep(tempIn, tempOut, hLowSize0, lowSize, ep);
-      copy(tempOut + NPAD, input, hLowSize0);
+      copy(tempOut + NPADDING, input, hLowSize0);
       input += src_stride_elements;
     }
 
     lowSize = (vLowSize0 + 1) >> 1;
     input = src;
     for (int j = 0; j < hLowSize0; j++) {
-      copy(input, src_stride_elements, tempIn + NPAD, vLowSize0);
+      copy(input, src_stride_elements, tempIn + NPADDING, vLowSize0);
       transformStep(tempIn, tempOut, vLowSize0, lowSize, ep);
-      copy(tempOut + NPAD, input, src_stride_elements, vLowSize0);
+      copy(tempOut + NPADDING, input, src_stride_elements, vLowSize0);
       input++;
     }
 
@@ -301,17 +299,17 @@ void filter(EngineParams& ep, unsigned int thread_id, int plane, float * src, in
     const int idx2 = hLowSize[nstepsInvert] + hHighSize[nstepsInvert];
     float * idx3 = src;
     for (int i = 0; i < idx2; i++) {
-      copy(idx3, src_stride_elements, tempIn + NPAD, idx);
+      copy(idx3, src_stride_elements, tempIn + NPADDING, idx);
       invertStep(tempIn, tempOut, temp2, idx, ep);
-      copy(tempOut + NPAD, idx3, src_stride_elements, idx);
+      copy(tempOut + NPADDING, idx3, src_stride_elements, idx);
       idx3++;
     }
 
     idx3 = src;
     for (int i = 0; i < idx; i++) {
-      copy(idx3, tempIn + NPAD, idx2);
+      copy(idx3, tempIn + NPADDING, idx2);
       invertStep(tempIn, tempOut, temp2, idx2, ep);
-      copy(tempOut + NPAD, idx3, idx2);
+      copy(tempOut + NPADDING, idx3, idx2);
       idx3 += src_stride_elements;
     }
   }

@@ -14,27 +14,29 @@
 #include "core.h"
 #include "version.hpp"
 
+int GetCPUFlags();
+
 struct VagueDenoiser final : Filter {
-  const float analysisLow[9] {
-    0.037828455506995f, -0.023849465019380f, -0.110624404418423f, 0.377402855612654f,
-    0.852698679009403f, 0.377402855612654f, -0.110624404418423f, -0.023849465019380f, 0.037828455506995f
+  const float analysisLow[8] {
+    0.037828455506995f, -0.023849465019380f, -0.110624404418423f, 0.377402855612654f, 0.852698679009403f
   };
-  const float analysisHigh[7] {
-    -0.064538882628938f, 0.040689417609558f, 0.418092273222212f, -0.788485616405664f,
-    0.418092273222212f, 0.040689417609558f, -0.064538882628938f
+  const float analysisHigh[8] {
+    -0.064538882628938f, 0.040689417609558f, 0.418092273222212f, -0.788485616405664f
   };
-  const float synthesisLow[7] {
-    -0.064538882628938f, -0.040689417609558f, 0.418092273222212f, 0.788485616405664f,
-    0.418092273222212f, -0.040689417609558f, -0.064538882628938f
+  const float synthesisLow[8] {
+    -0.064538882628938f, -0.040689417609558f, 0.418092273222212f, 0.788485616405664f
   };
-  const float synthesisHigh[9] {
-    -0.037828455506995f, -0.023849465019380f, 0.110624404418423f, 0.377402855612654f,
-    -0.852698679009403f, 0.377402855612654f, 0.110624404418423f, -0.023849465019380f, -0.037828455506995f
+  const float synthesisHigh[8] {
+    -0.037828455506995f, -0.023849465019380f, 0.110624404418423f, 0.377402855612654f, -0.852698679009403f
   };
 
   InDelegator* _in;
   DSVideoInfo out_vi;
   EngineParams ep;
+  int opt {0};
+  void (*cast_to_pad)(EngineParams& ep, unsigned int thread_id, int plane, const uint8_t* ptr, int depth, int stride, int width, int height);
+  void (*cast_from_pad)(EngineParams& ep, unsigned int thread_id, int plane, uint8_t* ptr, int depth, int stride, int width, int height);
+  void (*filter)(EngineParams& ep, unsigned int thread_id, int plane, float * src, int src_stride_elements, int width, int height);
 
   std::mutex thread_check_mutex;
   std::vector<bool> thread_id_store;
@@ -55,8 +57,7 @@ struct VagueDenoiser final : Filter {
       Param {"u", Integer, false, true, false},
       Param {"v", Integer, false, true, false},
 
-      Param {"opt", Integer},
-      Param {"threads", Integer}
+      Param {"opt", Integer}
     };
   }
   void Initialize(InDelegator* in, DSVideoInfo in_vi, FetchFrameFunctor* fetch_frame) override
@@ -69,8 +70,7 @@ struct VagueDenoiser final : Filter {
     in->Read("nsteps", ep.nsteps);
     in->Read("percent", ep.percent);
 
-    // in->Read("opt", opt);
-    // in->Read("threads", ep.threads);
+    in->Read("opt", opt);
 
     try {
       ep.process[0] =
@@ -114,22 +114,17 @@ struct VagueDenoiser final : Filter {
         (in_vi.Format.IsFloat   && in_vi.Format.BitsPerSample != 32))
       throw "only 8-16 bit integer and 32 bit float input supported";
 
-    if (ep.threshold <= 0.f) {
-        throw "threshold must be greater than 0.0";
-        return;
-    }
-    if (ep.method < 0 || ep.method > 2) {
-        throw "method must be set to 0, 1 or 2";
-        return;
-    }
-    if (ep.nsteps < 1) {
-        throw "nsteps must be greater than or equal to 1";
-        return;
-    }
-    if (ep.percent < 0.f || ep.percent > 100.f) {
-        throw "percent must be between 0.0 and 100.0 (inclusive)";
-        return;
-    }
+    if (ep.threshold <= 0.f)
+      throw "threshold must be greater than 0.0";
+
+    if (ep.method < 0 || ep.method > 2)
+      throw "method must be set to 0, 1 or 2";
+
+    if (ep.nsteps < 1)
+      throw "nsteps must be greater than or equal to 1";
+
+    if (ep.percent < 0.f || ep.percent > 100.f)
+      throw "percent must be between 0.0 and 100.0 (inclusive)";
 
     ep.width[0] = in_vi.Width;
     ep.width[1] =
@@ -155,25 +150,23 @@ struct VagueDenoiser final : Filter {
     if (ep.nsteps > max_steps)
       ep.nsteps = max_steps;
 
-    // selectFunctions(ftype, opt, &ep);
-
     int width_height_y = std::max(in_vi.Width, in_vi.Height);
     int width_height_uv = std::max(planeW, planeH);
 
     if (in_vi.Format.IsInteger) {
-        ep.threshold *= 1 << (in_vi.Format.BitsPerSample - 8);
-        ep.peak = (1 << in_vi.Format.BitsPerSample) - 1;
-        // Align to 64 bytes
-        ep.padStrideElements[0] = ((in_vi.Width - 1) | 15) + 1;
-        ep.padStrideElements[1] =
-        ep.padStrideElements[2] = ((planeW - 1) | 15) + 1;
-        ep.padSizeBytes[0] = ep.padStrideElements[0] * in_vi.Height * sizeof(float);
-        ep.padSizeBytes[1] =
-        ep.padSizeBytes[2] = ep.padStrideElements[1] * planeH * sizeof(float);
+      ep.threshold *= 1 << (in_vi.Format.BitsPerSample - 8);
+      ep.peak = (1 << in_vi.Format.BitsPerSample) - 1;
+      // Align to 64 bytes
+      ep.padStrideElements[0] = ((in_vi.Width - 1) | 15) + 1;
+      ep.padStrideElements[1] =
+      ep.padStrideElements[2] = ((planeW - 1) | 15) + 1;
+      ep.padSizeBytes[0] = ep.padStrideElements[0] * in_vi.Height * sizeof(float);
+      ep.padSizeBytes[1] =
+      ep.padSizeBytes[2] = ep.padStrideElements[1] * planeH * sizeof(float);
 
-        ep.tmpSizeBytes[0] = (32 + width_height_y) * sizeof(float);
-        ep.tmpSizeBytes[1] =
-        ep.tmpSizeBytes[2] = (32 + width_height_uv) * sizeof(float);
+      ep.tmpSizeBytes[0] = (32 + width_height_y) * sizeof(float);
+      ep.tmpSizeBytes[1] =
+      ep.tmpSizeBytes[2] = (32 + width_height_uv) * sizeof(float);
     }
     else
       ep.threshold /= 255.f;
@@ -182,6 +175,32 @@ struct VagueDenoiser final : Filter {
     ep.analysisHigh = analysisHigh;
     ep.synthesisLow = synthesisLow;
     ep.synthesisHigh = synthesisHigh;
+
+    auto CPUFlags = GetCPUFlags();
+
+    switch(in_vi.Format.BytesPerSample) {
+      case 1:  cast_from_pad = cast_from_pad_C<uint8_t>;  cast_to_pad = cast_to_pad_C<uint8_t>;  break;
+      default: cast_from_pad = cast_from_pad_C<uint16_t>; cast_to_pad = cast_to_pad_C<uint16_t>; break;
+    }
+    filter = filter_C;
+
+    if ((CPUFlags & CPUF_SSE) && (opt == 0 || opt > 1))
+      filter = filter_SSE;
+
+    if ((CPUFlags & CPUF_SSE4_1) && (opt == 0 || opt > 2))
+      switch(in_vi.Format.BytesPerSample) {
+        case 1:  cast_from_pad = cast_from_pad_SSE41<uint8_t>;  cast_to_pad = cast_to_pad_SSE41<uint8_t>;  break;
+        default: cast_from_pad = cast_from_pad_SSE41<uint16_t>; cast_to_pad = cast_to_pad_SSE41<uint16_t>; break;
+      }
+
+    if ((CPUFlags & CPUF_AVX) && (opt == 0 || opt > 3))
+      filter = filter_AVX;
+
+    if ((CPUFlags & CPUF_AVX2) && (opt == 0 || opt > 4))
+      switch(in_vi.Format.BytesPerSample) {
+        case 1:  cast_from_pad = cast_from_pad_AVX2<uint8_t>;  cast_to_pad = cast_to_pad_AVX2<uint8_t>;  break;
+        default: cast_from_pad = cast_from_pad_AVX2<uint16_t>; cast_to_pad = cast_to_pad_AVX2<uint16_t>; break;
+      }
   }
 
   DSFrame GetFrame(int n, std::unordered_map<int, DSFrame> in_frames) override
@@ -219,7 +238,9 @@ struct VagueDenoiser final : Filter {
     auto src0 = in_frames[n];
     auto dst = src0.Create(false);
 
-    for (int p = 0; p < in_vi.Format.Planes; p++) {
+    // for (int p = 0; p < in_vi.Format.Planes; p++) {
+    std::for_each_n(std::execution::par, reinterpret_cast<char*>(0), in_vi.Format.Planes, [&](char&idx) {
+      int p = static_cast<int>(reinterpret_cast<intptr_t>(&idx));
       bool chroma = in_vi.Format.IsFamilyYUV && p > 0 && p < 3;
       auto height = in_vi.Height;
       auto width = in_vi.Width;
@@ -238,10 +259,7 @@ struct VagueDenoiser final : Filter {
         int block_stride_elements;
 
         if (in_vi.Format.IsInteger) {
-          if (in_vi.Format.BitsPerSample == 8)
-            cast_to_pad_c<uint8_t>(ep, thread_id, p, src0_ptr, in_vi.Format.BitsPerSample, src0_stride, width, height);
-          else
-            cast_to_pad_c<uint16_t>(ep, thread_id, p, src0_ptr, in_vi.Format.BitsPerSample, src0_stride, width, height);
+          cast_to_pad(ep, thread_id, p, src0_ptr, in_vi.Format.BitsPerSample, src0_stride, width, height);
 
           block = ep.padBuffer[p][thread_id];
           block_stride_elements = ep.padStrideElements[p];
@@ -255,16 +273,13 @@ struct VagueDenoiser final : Filter {
         filter(ep, thread_id, p, block, block_stride_elements, width, height);
 
         if (in_vi.Format.IsInteger) {
-          if (in_vi.Format.BitsPerSample == 8)
-            cast_from_pad_c<uint8_t>(ep, thread_id, p, dst0_ptr, in_vi.Format.BitsPerSample, dst0_stride, width, height);
-          else
-            cast_from_pad_c<uint16_t>(ep, thread_id, p, dst0_ptr, in_vi.Format.BitsPerSample, dst0_stride, width, height);
+          cast_from_pad(ep, thread_id, p, dst0_ptr, in_vi.Format.BitsPerSample, dst0_stride, width, height);
         }
       }
       else if (ep.process[p] == 2) {
         framecpy(dst0_ptr, dst0_stride, src0_ptr, src0_stride, width * in_vi.Format.BytesPerSample, height);
       }
-    }
+    });
 
     thread_id_store[thread_id] = false;
     return dst;
