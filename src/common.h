@@ -5,6 +5,11 @@
 #include <vector>
 #include <algorithm>
 
+#ifndef _WIN32
+  #define _aligned_malloc(a,b) aligned_alloc(b,a)
+  #define _aligned_free(a) free(a)
+#endif
+
 struct EngineParams
 {
   int process[4];

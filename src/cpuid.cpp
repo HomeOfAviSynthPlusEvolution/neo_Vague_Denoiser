@@ -26,6 +26,7 @@
 #else
 #include <x86intrin.h>
 #undef __cpuid
+#include <cpuid.h>
 
 static inline void __cpuid(int cpuinfo[4], int leaf) {
   unsigned int eax, ebx, ecx, edx;
