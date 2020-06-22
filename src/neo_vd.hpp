@@ -7,8 +7,15 @@
 
 #pragma once
 
+#ifdef HAS_EXECUTION
+  #include <execution>
+#endif
+
+#ifndef __cpp_lib_execution
+  #undef ENABLE_PAR
+#endif
+
 #include <numeric>
-#include <execution>
 #include <mutex>
 #include "common.h"
 #include "core.h"
@@ -238,9 +245,12 @@ struct VagueDenoiser final : Filter {
     auto src0 = in_frames[n];
     auto dst = src0.Create(false);
 
-    // for (int p = 0; p < in_vi.Format.Planes; p++) {
+  #ifdef ENABLE_PAR
     std::for_each_n(std::execution::par, reinterpret_cast<char*>(0), in_vi.Format.Planes, [&](char&idx) {
       int p = static_cast<int>(reinterpret_cast<intptr_t>(&idx));
+  #else
+    for (int p = 0; p < in_vi.Format.Planes; p++) {
+  #endif
       bool chroma = in_vi.Format.IsFamilyYUV && p > 0 && p < 3;
       auto height = in_vi.Height;
       auto width = in_vi.Width;
@@ -279,7 +289,10 @@ struct VagueDenoiser final : Filter {
       else if (ep.process[p] == 2) {
         framecpy(dst0_ptr, dst0_stride, src0_ptr, src0_stride, width * in_vi.Format.BytesPerSample, height);
       }
-    });
+    }
+  #ifdef ENABLE_PAR
+    );
+  #endif
 
     thread_id_store[thread_id] = false;
     return dst;
