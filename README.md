@@ -22,7 +22,7 @@ core.neo_vd.VagueDenoiser(clip, threshold=2.0, nsteps=6, planes=[0,1,2], ...)
 
 Parameters:
 
-[Check original VapourSynth-VagueDenoiser usage documents.](https://github.com/HomeOfVapourSynthEvolution/VapourSynth-VagueDenoiser/blob/master/README.md)
+[Check original VapourSynth-VagueDenoiser usage documents.](vapoursynth-vaguedenoiser.README.md)
 
 - *y*, *u*, *v* (AviSynth+ only)
 
