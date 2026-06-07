@@ -25,6 +25,6 @@ struct EngineParams
   int padStrideElements[3], padSizeBytes[3], tmpSizeBytes[3];
   std::vector<float*> padBuffer[3];
   std::vector<float*> tmpBuffer[3][3]; // tmpBuffer[plane][tmpIn=0/tmpOut=1/tmp2=2]
-  std::vector<int*> hvBuffer[3][4]; // hvBuffer[plane][hL=0/hH=1/vL=2/vH=3]
+  std::vector<std::vector<int>> hvBuffer[3][4]; // hvBuffer[plane][hL=0/hH=1/vL=2/vH=3]
   const float * analysisLow, * analysisHigh, * synthesisLow, * synthesisHigh;
 };

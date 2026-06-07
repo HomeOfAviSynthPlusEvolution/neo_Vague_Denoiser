@@ -233,10 +233,10 @@ struct VagueDenoiser final : Filter {
             ep.tmpBuffer[p][2].push_back((float *)_aligned_malloc(ep.tmpSizeBytes[p], FRAME_ALIGN));
           }
           while (ep.hvBuffer[p][0].size() <= thread_id) {
-            ep.hvBuffer[p][0].push_back((int *)_aligned_malloc(ep.nsteps, FRAME_ALIGN));
-            ep.hvBuffer[p][1].push_back((int *)_aligned_malloc(ep.nsteps, FRAME_ALIGN));
-            ep.hvBuffer[p][2].push_back((int *)_aligned_malloc(ep.nsteps, FRAME_ALIGN));
-            ep.hvBuffer[p][3].push_back((int *)_aligned_malloc(ep.nsteps, FRAME_ALIGN));
+            ep.hvBuffer[p][0].emplace_back(static_cast<size_t>(ep.nsteps));
+            ep.hvBuffer[p][1].emplace_back(static_cast<size_t>(ep.nsteps));
+            ep.hvBuffer[p][2].emplace_back(static_cast<size_t>(ep.nsteps));
+            ep.hvBuffer[p][3].emplace_back(static_cast<size_t>(ep.nsteps));
           }
         }
       }

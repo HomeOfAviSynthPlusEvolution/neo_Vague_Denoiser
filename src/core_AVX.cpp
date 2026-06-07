@@ -268,10 +268,10 @@ void filter_AVX(EngineParams& ep, unsigned int thread_id, int plane, float * src
   float* tempOut = ep.tmpBuffer[plane][1][thread_id];
   float* temp2 = ep.tmpBuffer[plane][2][thread_id];
 
-  int* hLowSize = ep.hvBuffer[plane][0][thread_id];
-  int* hHighSize = ep.hvBuffer[plane][1][thread_id];
-  int* vLowSize = ep.hvBuffer[plane][2][thread_id];
-  int* vHighSize = ep.hvBuffer[plane][3][thread_id];
+  int* hLowSize = ep.hvBuffer[plane][0][thread_id].data();
+  int* hHighSize = ep.hvBuffer[plane][1][thread_id].data();
+  int* vLowSize = ep.hvBuffer[plane][2][thread_id].data();
+  int* vHighSize = ep.hvBuffer[plane][3][thread_id].data();
 
   int hLowSize0 = width;
   int vLowSize0 = height;
