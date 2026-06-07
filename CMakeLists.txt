@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required (VERSION 3.10)
 project (neo_vague_denoiser CXX)
 file(GLOB CODE "src/*.cpp")
 file(GLOB SSE_CODE_IMPL "src/*SSE.cpp")
