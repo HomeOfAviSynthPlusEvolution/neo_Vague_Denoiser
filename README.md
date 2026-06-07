@@ -45,6 +45,24 @@ Parameters:
         4 - Use up to AVX (for core)
         5 - Use up to AVX2 (for data copy)
 
+## Build on Windows
+
+```bat
+set "CONFIG=%~1"
+if "%CONFIG%"=="" set "CONFIG=Release"
+
+if not defined CMAKE_GENERATOR set "CMAKE_GENERATOR=Visual Studio 18 2026"
+
+set "SOURCE_DIR=%~dp0."
+set "BUILD_DIR=%~dp0build"
+
+cmake --fresh -S "%SOURCE_DIR%" -B "%BUILD_DIR%\msvc-x86" -G "%CMAKE_GENERATOR%" -A Win32 || exit /b 1
+cmake --fresh -S "%SOURCE_DIR%" -B "%BUILD_DIR%\msvc-x64" -G "%CMAKE_GENERATOR%" -A x64 || exit /b 1
+
+cmake --build "%BUILD_DIR%\msvc-x86" --config "%CONFIG%" --parallel || exit /b 1
+cmake --build "%BUILD_DIR%\msvc-x64" --config "%CONFIG%" --parallel || exit /b 1
+```
+
 ## License
 
 * GPLv2.

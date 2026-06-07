@@ -81,7 +81,46 @@ if(ENABLE_PAR AND HAS_EXECUTION)
   endif()
 endif()
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(NEO_VD_TOOLCHAIN "msvc")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  set(NEO_VD_TOOLCHAIN "icc")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(NEO_VD_TOOLCHAIN "gcc")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(NEO_VD_TOOLCHAIN "clang")
+else()
+  string(TOLOWER "${CMAKE_CXX_COMPILER_ID}" NEO_VD_TOOLCHAIN)
+endif()
+
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "Win32")
+  set(NEO_VD_ARCH "x86")
+elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "x64")
+  set(NEO_VD_ARCH "x64")
+elseif(CMAKE_GENERATOR_PLATFORM)
+  string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" NEO_VD_ARCH)
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(NEO_VD_ARCH "x64")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set(NEO_VD_ARCH "x86")
+else()
+  set(NEO_VD_ARCH "unknown")
+endif()
+
+set(NEO_VD_TOOLSET_SUFFIX "")
+if(CMAKE_GENERATOR_TOOLSET MATCHES "v[0-9]+_xp")
+  set(NEO_VD_TOOLSET_SUFFIX "-xp")
+endif()
+
+set(NEO_VD_PACKAGE_DIR
+  "${PROJECT_BINARY_DIR}/../Release_${VERSION}/${NEO_VD_TOOLCHAIN}-${NEO_VD_ARCH}${NEO_VD_TOOLSET_SUFFIX}"
+)
+
 add_custom_command(
   TARGET neo-vague-denoiser POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neo-vague-denoiser> "../Release_${VERSION}/${_DIR}/$<TARGET_FILE_NAME:neo-vague-denoiser>"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${NEO_VD_PACKAGE_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "$<TARGET_FILE:neo-vague-denoiser>"
+          "${NEO_VD_PACKAGE_DIR}/$<TARGET_FILE_NAME:neo-vague-denoiser>"
+  VERBATIM
 )
